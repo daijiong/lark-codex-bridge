@@ -1,8 +1,9 @@
 {
   "name": "lark-codex-bridge",
-  "version": "0.1.29",
+  "version": "0.0.1",
   "description": "Bridge Feishu/Lark messenger with local Codex CLI coding agents",
   "type": "module",
+  "packageManager": "pnpm@10.14.0",
   "bin": {
     "lark-codex-bridge": "./bin/lark-codex-bridge.mjs"
   },
@@ -17,6 +18,7 @@
     "bin",
     "README.md",
     "README.zh.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "scripts": {
@@ -24,7 +26,19 @@
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "prepublishOnly": "pnpm typecheck && pnpm build"
+    "verify": "pnpm typecheck && pnpm build && pnpm test && node dist/cli.js --help && npm --cache .npm-cache pack --dry-run",
+    "prepublishOnly": "pnpm verify"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xile611/lark-codex-bridge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/xile611/lark-codex-bridge/issues"
+  },
+  "homepage": "https://github.com/xile611/lark-codex-bridge#readme",
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "@larksuiteoapi/node-sdk": "^1.64.0",

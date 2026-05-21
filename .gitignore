@@ -1,6 +1,7 @@
 node_modules/
 dist/
 coverage/
+.npm-cache/
 *.log
 *.tsbuildinfo
 
@@ -12,6 +13,5 @@ coverage/
 .idea/
 .vscode/
 
-# Internal-only: dev smoke scripts and full changelog stay local, do not ship
+# Internal-only: dev smoke scripts stay local, do not ship
 scripts/
-CHANGELOG.md

@@ -219,6 +219,10 @@ grep '"event":"enter"' ~/.lark-codex/logs/$(date +%Y-%m-%d).log | tail -5
 
 **图片发过去 Codex 说看不到**：确认当前 Codex CLI 支持 `codex exec --image`，并查看日志里的附件下载路径。
 
+## 维护者发布
+
+本项目通过 GitHub Actions + npm Trusted Publishing 自动发布，流程见 [docs/release.md](./docs/release.md)。
+
 ## 许可
 
 [MIT](./LICENSE)

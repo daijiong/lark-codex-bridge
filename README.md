@@ -219,6 +219,10 @@ After a manual edit, **restart the bridge** or send **`/reconnect`** from any al
 
 **Codex says it can't see the image I sent.** Confirm your local Codex CLI supports `codex exec --image`, then check the downloaded attachment path in the bridge logs.
 
+## Maintainer Release
+
+This project publishes through GitHub Actions + npm Trusted Publishing. See [docs/release.md](./docs/release.md).
+
 ## License
 
 [MIT](./LICENSE)
