@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@10.14.0",
   "bin": {
-    "lark-codex-bridge": "./bin/lark-codex-bridge.mjs"
+    "lark-codex-bridge": "bin/lark-codex-bridge.mjs"
   },
   "exports": {
     ".": {
