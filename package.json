@@ -27,6 +27,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "verify": "pnpm typecheck && pnpm build && pnpm test && node dist/cli.js --help && npm --cache .npm-cache pack --dry-run",
+    "manual:publish": "pnpm verify && npm --cache .npm-cache publish --access public --registry=https://registry.npmjs.org",
     "prepublishOnly": "pnpm verify"
   },
   "repository": {
