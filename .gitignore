@@ -12,6 +12,3 @@ coverage/
 .DS_Store
 .idea/
 .vscode/
-
-# Internal-only: dev smoke scripts stay local, do not ship
-scripts/

@@ -49,35 +49,45 @@ npm --cache .npm-cache view lark-codex-bridge version --registry=https://registr
 
 Choose the next SemVer version. For example, if npm has `0.0.1`, use `0.0.2` for a patch release.
 
-### 2. Update local version files
+### 2. Run the full manual release script
+
+The default is a patch release:
 
 ```bash
-pnpm version patch --no-git-tag-version
-```
-
-If using release-please later, keep the manifest in sync:
-
-```bash
-node -e "const fs=require('fs'); const pkg=require('./package.json'); const m=require('./.release-please-manifest.json'); m['.']=pkg.version; fs.writeFileSync('.release-please-manifest.json', JSON.stringify(m, null, 2)+'\n')"
-```
-
-Update `CHANGELOG.md` manually with the new version and release notes.
-
-### 3. Verify and publish
-
-```bash
-pnpm install --frozen-lockfile
 pnpm manual:publish
 ```
 
-`manual:publish` runs:
+To choose a different bump:
 
-- `pnpm verify`
-- `npm --cache .npm-cache publish --access public --registry=https://registry.npmjs.org`
+```bash
+pnpm manual:publish -- minor
+pnpm manual:publish -- major
+pnpm manual:publish -- 0.1.0
+```
 
-If npm asks for browser authentication or OTP, complete it and wait for publish to finish.
+To customize the changelog entry:
 
-### 4. Verify npm
+```bash
+RELEASE_NOTES="Fix npm bin path." pnpm manual:publish
+pnpm manual:publish -- --notes="Fix npm bin path."
+```
+
+`manual:publish` runs the full fallback release flow:
+
+1. Checks that the git worktree is clean.
+2. Runs `pnpm version <arg> --no-git-tag-version`.
+3. Updates `.release-please-manifest.json`.
+4. Prepends a `CHANGELOG.md` entry.
+5. Verifies the target npm version is not already published.
+6. Runs `pnpm verify`.
+7. Publishes with `npm --cache .npm-cache publish --access public --registry=https://registry.npmjs.org`.
+8. Commits `package.json`, `pnpm-lock.yaml`, `CHANGELOG.md`, and `.release-please-manifest.json`.
+9. Creates `v<version>`.
+10. Pushes the commit and tag.
+
+If npm asks for browser authentication or OTP, complete it and wait for publish to finish. If the script fails after npm publish succeeds, do not rerun it before checking npm; finish the git commit/tag/push steps manually if needed.
+
+### 3. Verify npm
 
 ```bash
 npm --cache .npm-cache view lark-codex-bridge version dist-tags bin --json --registry=https://registry.npmjs.org
@@ -88,17 +98,6 @@ Install and smoke test:
 ```bash
 npm --cache .npm-cache --prefix /tmp/lark-codex-bridge-smoke install lark-codex-bridge@latest --registry=https://registry.npmjs.org
 /tmp/lark-codex-bridge-smoke/node_modules/.bin/lark-codex-bridge --help
-```
-
-### 5. Commit and tag
-
-```bash
-version=$(node -p "require('./package.json').version")
-git add package.json pnpm-lock.yaml CHANGELOG.md .release-please-manifest.json
-git commit -m "chore: release ${version}"
-git tag "v${version}"
-git push
-git push origin "v${version}"
 ```
 
 If GitHub Actions is still billing-locked, pushing the tag may create failed workflow runs. That is acceptable; do not rerun the publish workflow for a version that was already manually published.
