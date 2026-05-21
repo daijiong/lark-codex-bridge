@@ -1,6 +1,6 @@
 {
   "name": "lark-codex-bridge",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Bridge Feishu/Lark messenger with local Codex CLI coding agents",
   "type": "module",
   "packageManager": "pnpm@10.14.0",
@@ -58,7 +58,10 @@
     "node": ">=20.0.0"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "protobufjs"]
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "protobufjs"
+    ]
   },
   "keywords": [
     "feishu",
