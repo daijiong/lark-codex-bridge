@@ -140,7 +140,7 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
     appId: cfg.accounts.app.id,
     appSecret,
     domain: cfg.accounts.app.tenant === 'lark' ? Domain.Lark : Domain.Feishu,
-    source: 'lark-channel-bridge',
+    source: 'lark-codex-bridge',
     loggerLevel: LoggerLevel.info,
     logger: buildQuietLogger(),
     policy: {
@@ -513,6 +513,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     prompt,
     sessionId: resumeFrom,
     cwd,
+    imagePaths: attachments.filter((a) => a.kind === 'image').map((a) => a.path),
     stopGraceMs: getAgentStopGraceMs(controls.cfg),
   });
   const handle = activeRuns.register(scope, run);
@@ -548,7 +549,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     ...(mode === 'topic' && threadId ? { replyInThread: true } : {}),
   };
 
-  // For non-card modes Claude's output doesn't surface visually until either
+  // For non-card modes agent output doesn't surface visually until either
   // a first streamed token (markdown mode) or the whole run ends (text mode).
   // Add a "Typing" reaction to the triggering message as an instant ack;
   // remove it in finally. Card mode has a visible "正在思考…" footer the
@@ -622,13 +623,13 @@ async function processAgentStream(
 ): Promise<void> {
   let state: RunState = initialState;
 
-  // Idle watchdog: claude going silent for `idleTimeoutMs` is treated as
+  // Idle watchdog: the agent going silent for `idleTimeoutMs` is treated as
   // "presumed hung", we stop() and surface a timeout marker on the card.
   //
-  // BUT — claude can legitimately be silent for a long time when it's
+  // BUT — the agent can legitimately be silent for a long time when it's
   // waiting on a long-running tool call (e.g. `lark-cli` printing an
   // OAuth URL and blocking until the user clicks authorize). In that
-  // case there's no event stream activity from claude itself, only the
+  // case there's no event stream activity from the agent itself, only the
   // tool subprocess running. We track which tool_use ids haven't matched
   // a tool_result yet, and pause the watchdog whenever the set is
   // non-empty.
@@ -696,7 +697,7 @@ async function processAgentStream(
         log.info('card', 'transition', { footer: state.footer, terminal: state.terminal });
       }
       await flush(state);
-      // Stop iterating as soon as we have a terminal state. Some claude
+      // Stop iterating as soon as we have a terminal state. Some agent
       // versions don't close stdout immediately after the result event, which
       // would leave the for-await waiting forever otherwise.
       if (state.terminal !== 'running') break;
@@ -707,7 +708,7 @@ async function processAgentStream(
 
   // If state already reached a terminal event (done/error/etc.) before the
   // watchdog or interrupt could land, don't clobber it — that real terminal
-  // wins. This avoids "claude finished but flush was slow → timer fired
+  // wins. This avoids "agent finished but flush was slow → timer fired
   // mid-flush → user sees 'idle_timeout' on a successful run".
   if (state.terminal === 'running') {
     if (idleFired) {
@@ -723,7 +724,7 @@ async function processAgentStream(
     // Reap the subprocess. Two regimes:
   //  - Interrupted (user /stop, idle watchdog, disconnect): stop() was already
   //    fire-and-forgotten by whoever set handle.interrupted; this awaits it.
-  //  - Natural done: stream-json emits `result` ~1ms before claude actually
+  //  - Natural done: the JSON stream emits a terminal event before the agent
   //    closes stdout (telemetry flush). Wait it out so the run exits with
   //    code 0; only SIGTERM as a hung-process safety net.
   if (handle.interrupted) {
@@ -738,8 +739,8 @@ async function processAgentStream(
 }
 
 /**
- * How long to wait for claude to close stdout after a terminal event before
- * forcing a SIGTERM. Empirically claude's post-`result` tail is well under a
+ * How long to wait for the agent to close stdout after a terminal event before
+ * forcing a SIGTERM. Empirically the post-terminal tail is well under a
  * second; 2s leaves headroom for slow flushes without making the user notice
  * a stall (the card has already rendered terminal state by this point).
  */
@@ -806,4 +807,3 @@ function stripAttachmentRefs(text: string, fileKeys: string[]): string {
   }
   return out.replace(/\n{3,}/g, '\n\n');
 }
-

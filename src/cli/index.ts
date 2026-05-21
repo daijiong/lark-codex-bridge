@@ -13,7 +13,7 @@ import { runStart } from './commands/start';
 const program = new Command();
 
 program
-  .name('lark-channel-bridge')
+  .name('lark-codex-bridge')
   .description('Bridge Feishu/Lark messenger with local CLI coding agents')
   .version(pkg.version, '-v, --version');
 
@@ -28,8 +28,8 @@ program
 program
   .command('migrate')
   .description(
-    'Migrate from pre-0.1.11 setup: move ~/.config/lark-channel-bridge/* and ' +
-      '~/.cache/lark-channel-bridge/* into ~/.lark-channel/, and rewrite ' +
+    'Migrate from pre-0.1.11 setup: move ~/.config/lark-codex-bridge/* and ' +
+      '~/.cache/lark-codex-bridge/* into ~/.lark-codex/, and rewrite ' +
       'config.json from { app } to { accounts.app }',
   )
   .option('-c, --config <path>', 'path to config file (after migration)')
@@ -39,7 +39,7 @@ program
 
 program
   .command('ps')
-  .description('List running lark-channel-bridge start processes (this machine)')
+  .description('List running lark-codex-bridge start processes (this machine)')
   .action(() => {
     runPs();
   });
@@ -53,11 +53,11 @@ program
 
 const secrets = program
   .command('secrets')
-  .description('Manage the bridge\'s encrypted secret keystore (~/.lark-channel/secrets.enc)');
+  .description('Manage the bridge\'s encrypted secret keystore (~/.lark-codex/secrets.enc)');
 
 secrets
   .command('get')
-  .description('Exec-provider protocol: read JSON request from stdin, write JSON response to stdout. Used by lark-cli config bind --source lark-channel.')
+  .description('Exec-provider protocol: read JSON request from stdin, write JSON response to stdout. Used by lark-cli config bind --source lark-codex.')
   .action(async () => {
     await runSecretsGet();
   });
@@ -94,14 +94,14 @@ program
 
 program
   .command('doctor')
-  .description('Check config, claude CLI, and required platform scopes')
+  .description('Check config, Codex CLI, and required platform scopes')
   .action(async () => {
     console.log('doctor: not implemented yet');
   });
 
 program
   .command('handover <text>')
-  .description('Hand over a terminal Claude Code session to Feishu')
+  .description('Hand over a terminal Codex session to Feishu')
   .action(async (_text: string) => {
     console.log('handover: not implemented yet');
   });

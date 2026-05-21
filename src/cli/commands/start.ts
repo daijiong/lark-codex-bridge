@@ -1,14 +1,14 @@
 import dns from 'node:dns';
 import { createInterface } from 'node:readline';
 import pkg from '../../../package.json';
-import { ClaudeAdapter } from '../../agent/claude/adapter';
+import { CodexAdapter, type CodexAdapterOptions } from '../../agent/codex/adapter';
 import { startChannel, type BridgeChannel } from '../../bot/channel';
 import { runRegistrationWizard } from '../../bot/wizard';
 import type { Controls } from '../../commands';
 import { setSecret } from '../../config/keystore';
 import { paths } from '../../config/paths';
 import type { AppConfig } from '../../config/schema';
-import { isComplete, secretKeyForApp } from '../../config/schema';
+import { getAgentPreferences, isComplete, secretKeyForApp } from '../../config/schema';
 import {
   buildEncryptedAccountConfig,
   ensureSecretsGetterWrapper,
@@ -73,10 +73,13 @@ export async function runStart(opts: StartOptions): Promise<void> {
     printScopeReminder();
   }
 
-  const agent = new ClaudeAdapter();
+  let currentCfg = cfg;
+  const agent = new CodexAdapter({}, () => codexOptionsFromConfig(currentCfg));
   if (!(await agent.isAvailable())) {
-    console.error('✗ 未找到 claude CLI。请先安装 Claude Code：');
-    console.error('  https://docs.anthropic.com/en/docs/claude-code/quickstart');
+    const agentPrefs = getAgentPreferences(cfg);
+    console.error(`✗ 未找到 Codex CLI (${agentPrefs.codexBinary})。请先安装并登录 Codex：`);
+    console.error('  npm install -g @openai/codex');
+    console.error('  codex login');
     process.exit(1);
   }
 
@@ -152,6 +155,7 @@ export async function runStart(opts: StartOptions): Promise<void> {
         const next = await loadConfig(configPath);
         if (!isComplete(next)) throw new Error('config incomplete after change');
         controls.cfg = next;
+        currentCfg = next;
         // Keep the registry in sync so /ps reflects the new app after an
         // /account change. Same process id, new app fields. botName is
         // refreshed below once the new channel is up.
@@ -205,6 +209,20 @@ export async function runStart(opts: StartOptions): Promise<void> {
   await new Promise<void>(() => {});
 }
 
+function codexOptionsFromConfig(cfg: AppConfig): CodexAdapterOptions {
+  const prefs = getAgentPreferences(cfg);
+  return {
+    binary: prefs.codexBinary,
+    model: prefs.model,
+    profile: prefs.profile,
+    profileV2: prefs.profileV2,
+    sandbox: prefs.sandbox,
+    skipGitRepoCheck: prefs.skipGitRepoCheck,
+    search: prefs.search,
+    extraArgs: prefs.extraArgs,
+  };
+}
+
 /**
  * Print the same-app conflict, then ask the user how to proceed. Returns
  * true to continue starting (after killing the old ones), false to cancel.
@@ -230,7 +248,7 @@ async function resolveConflict(
 
   if (!process.stdin.isTTY) {
     console.warn(
-      '⚠️  当前不是交互式启动,已自动取消。如需替换,先用 `lark-channel-bridge stop <bot id>` 关掉旧的。\n',
+      '⚠️  当前不是交互式启动,已自动取消。如需替换,先用 `lark-codex-bridge stop <bot id>` 关掉旧的。\n',
     );
     return false;
   }
@@ -292,7 +310,7 @@ async function maybeMigratePlaintextSecret(
       );
       await setSecret(secretKeyForApp(cfg.accounts.app.id), s);
       await saveConfig(next, configPath);
-      console.log('🔒 已把 App Secret 加密迁移到 ~/.lark-channel/secrets.enc');
+      console.log('🔒 已把 App Secret 加密迁移到 ~/.lark-codex/secrets.enc');
       return next;
     } catch (err) {
       log.warn('config', 'migrate-encrypted-failed', {

@@ -12,8 +12,15 @@ import {
 import { configCancelledCard, configFormCard, configSavedCard } from '../card/config-card';
 import { forgetManagedCard, sendManagedCard, updateManagedCard } from '../card/managed';
 import { helpCard, resumeCard, statusCard, workspacesCard } from '../card/templates';
-import type { AppConfig, MessageReplyMode, TenantBrand } from '../config/schema';
+import type {
+  AgentPreferences,
+  AppConfig,
+  CodexSandboxMode,
+  MessageReplyMode,
+  TenantBrand,
+} from '../config/schema';
 import {
+  getAgentPreferences,
   getAgentStopGraceMs,
   getMaxConcurrentRuns,
   getMessageReplyMode,
@@ -42,7 +49,7 @@ import type { WorkspaceStore } from '../workspace/store';
 import { createBoundChat, defaultChatName } from '../bot/group';
 
 export interface Controls {
-  /** Restart the bridge in-process: disconnect WS, kill claude runs, reload
+  /** Restart the bridge in-process: disconnect WS, kill agent runs, reload
    * config, reconnect with the new credentials. */
   restart(): Promise<void>;
   /** Stop this whole process gracefully (disconnect + exit). Used by /exit
@@ -551,14 +558,14 @@ async function handleReconnect(_args: string, ctx: CommandContext): Promise<void
   }
 }
 
-const DOCTOR_INSTRUCTIONS = `你是 lark-channel-bridge 的诊断助理。下面会给你两段输入:
+const DOCTOR_INSTRUCTIONS = `你是 lark-codex-bridge 的诊断助理。下面会给你两段输入:
 1. 用户的故障描述
 2. 最近的运行日志(JSON line 格式,旧→新)
 
 日志字段含义:
 - ts: ISO 时间戳
 - level: info | warn | error
-- phase: 模块阶段。常见值: ws(WebSocket), intake(消息入站), queue(去抖队列), flush(批处理), media(附件下载), prompt(prompt 组装), session(会话), agent(claude 子进程), card(卡片渲染), comment(文档评论), cardAction(卡片回调), command(斜杠命令), sdk(飞书 SDK 内部)
+- phase: 模块阶段。常见值: ws(WebSocket), intake(消息入站), queue(去抖队列), flush(批处理), media(附件下载), prompt(prompt 组装), session(会话), agent(Codex 子进程), card(卡片渲染), comment(文档评论), cardAction(卡片回调), command(斜杠命令), sdk(飞书 SDK 内部)
 - event: enter | exit | transition | fail | 各 phase 自定义事件
 - traceId: 同一逻辑操作的串联 ID(同一条消息的多个日志会共享)
 - chatId: 飞书聊天 ID(用 chatId 反查相关日志)
@@ -609,7 +616,7 @@ async function handleDoctor(args: string, ctx: CommandContext): Promise<void> {
     return;
   }
   // Scrub identifying / credential material before the logs (a) reach
-  // Anthropic via the agent prompt, and (b) end up in any card payload
+  // the configured model provider via the agent prompt, and (b) end up in any card payload
   // Lark may cache server-side.
   const logs = sanitizeLogsForDoctor(rawLogs);
 
@@ -653,7 +660,7 @@ async function handleDoctor(args: string, ctx: CommandContext): Promise<void> {
                 }
                 state = reduce(state, evt);
                 await flush();
-                // Don't wait for stdout to close — some claude versions hang
+                // Don't wait for stdout to close — some agent versions hang
                 // briefly post-result, which would leave the for-await stuck.
                 if (state.terminal !== 'running') break;
               }
@@ -831,7 +838,7 @@ async function submitAccount(ctx: CommandContext): Promise<void> {
 
     // Encrypted-at-rest path: store the plaintext secret in the AES keystore,
     // and write config.json with an exec-provider SecretRef instead of the
-    // raw secret. lark-cli's `config bind --source lark-channel` reads the
+    // raw secret. lark-cli's `config bind --source lark-codex` reads the
     // same SecretRef and goes through the exec protocol to retrieve the
     // plaintext into its own OS keychain — no plaintext on disk.
     let newCfg: AppConfig;
@@ -891,7 +898,15 @@ async function handleConfig(args: string, ctx: CommandContext): Promise<void> {
 async function showConfigForm(ctx: CommandContext): Promise<void> {
   const ms = getRunIdleTimeoutMs(ctx.controls.cfg);
   const access = ctx.controls.cfg.preferences?.access ?? {};
+  const agent = getAgentPreferences(ctx.controls.cfg);
   const card = configFormCard({
+    codexBinary: agent.codexBinary,
+    codexModel: agent.model ?? '',
+    codexProfile: agent.profile ?? '',
+    codexProfileV2: agent.profileV2 ?? '',
+    codexSandbox: agent.sandbox,
+    codexSkipGitRepoCheck: agent.skipGitRepoCheck,
+    codexSearch: agent.search,
     messageReply: getMessageReplyMode(ctx.controls.cfg),
     showToolCalls: getShowToolCalls(ctx.controls.cfg),
     maxConcurrentRuns: getMaxConcurrentRuns(ctx.controls.cfg),
@@ -920,6 +935,30 @@ async function cancelConfig(ctx: CommandContext): Promise<void> {
 
 async function submitConfig(ctx: CommandContext): Promise<void> {
   const fv = ctx.formValue ?? {};
+  const currentAgent = getAgentPreferences(ctx.controls.cfg);
+  const trimField = (raw: unknown): string => String(raw ?? '').trim();
+  const yesNo = (raw: unknown, fallback: boolean): boolean => {
+    const value = trimField(raw);
+    if (value === 'yes') return true;
+    if (value === 'no') return false;
+    return fallback;
+  };
+  const sandboxValue = trimField(fv.codex_sandbox);
+  const codexSandbox: CodexSandboxMode =
+    sandboxValue === 'read-only' ||
+    sandboxValue === 'workspace-write' ||
+    sandboxValue === 'danger-full-access'
+      ? sandboxValue
+      : currentAgent.sandbox;
+  const codexBinary = trimField(fv.codex_binary) || currentAgent.codexBinary;
+  const codexModel = trimField(fv.codex_model);
+  const codexProfile = trimField(fv.codex_profile);
+  const codexProfileV2 = trimField(fv.codex_profile_v2);
+  const codexSkipGitRepoCheck = yesNo(
+    fv.codex_skip_git_repo_check,
+    currentAgent.skipGitRepoCheck,
+  );
+  const codexSearch = yesNo(fv.codex_search, currentAgent.search);
   const rawReply = String(fv.message_reply ?? '').trim();
   const messageReply: MessageReplyMode =
     rawReply === 'markdown' || rawReply === 'text' || rawReply === 'card'
@@ -1035,6 +1074,15 @@ async function submitConfig(ctx: CommandContext): Promise<void> {
     // runAgentBatch's reads, so this takes effect on the next message.
     ctx.controls.cfg.preferences = {
       ...(ctx.controls.cfg.preferences ?? {}),
+      agent: nextAgentPreferences(ctx.controls.cfg.preferences?.agent, {
+        codexBinary,
+        model: codexModel,
+        profile: codexProfile,
+        profileV2: codexProfileV2,
+        sandbox: codexSandbox,
+        skipGitRepoCheck: codexSkipGitRepoCheck,
+        search: codexSearch,
+      }),
       messageReply,
       // Mark the messageReply value as living in the new (post-0.1.27)
       // semantic — `text` now means real plain text, not the lightweight
@@ -1061,6 +1109,13 @@ async function submitConfig(ctx: CommandContext): Promise<void> {
     }
 
     log.info('command', 'config-saved', {
+      codexBinary,
+      codexModel: codexModel || undefined,
+      codexProfile: codexProfile || undefined,
+      codexProfileV2: codexProfileV2 || undefined,
+      codexSandbox,
+      codexSkipGitRepoCheck,
+      codexSearch,
       messageReply,
       showToolCalls,
       maxConcurrentRuns,
@@ -1075,6 +1130,13 @@ async function submitConfig(ctx: CommandContext): Promise<void> {
       channel,
       formMsgId,
       configSavedCard({
+        codexBinary,
+        codexModel,
+        codexProfile,
+        codexProfileV2,
+        codexSandbox,
+        codexSkipGitRepoCheck,
+        codexSearch,
         messageReply,
         showToolCalls,
         maxConcurrentRuns,
@@ -1089,4 +1151,27 @@ async function submitConfig(ctx: CommandContext): Promise<void> {
     );
     forgetManagedCard(formMsgId);
   })();
+}
+
+function nextAgentPreferences(
+  existing: AgentPreferences | undefined,
+  submitted: Required<
+    Pick<
+      AgentPreferences,
+      'codexBinary' | 'sandbox' | 'skipGitRepoCheck' | 'search'
+    >
+  > &
+    Pick<AgentPreferences, 'model' | 'profile' | 'profileV2'>,
+): AgentPreferences {
+  return {
+    ...(existing?.extraArgs ? { extraArgs: existing.extraArgs } : {}),
+    provider: 'codex',
+    codexBinary: submitted.codexBinary,
+    sandbox: submitted.sandbox,
+    skipGitRepoCheck: submitted.skipGitRepoCheck,
+    search: submitted.search,
+    ...(submitted.model ? { model: submitted.model } : {}),
+    ...(submitted.profile ? { profile: submitted.profile } : {}),
+    ...(submitted.profileV2 ? { profileV2: submitted.profileV2 } : {}),
+  };
 }

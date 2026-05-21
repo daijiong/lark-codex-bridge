@@ -4,7 +4,7 @@ export type TenantBrand = 'feishu' | 'lark';
  * SecretRef points at a secret stored outside this file — keeps secrets out
  * of `config.json` so backups / accidental git commits / log dumps don't
  * leak the bot's App Secret. Mirrors openclaw / lark-cli's `SecretRef`
- * shape so lark-cli's `--source lark-channel` reads it through the same
+ * shape so lark-cli's `--source lark-codex` reads it through the same
  * generic `ResolveSecretInput` pipeline as openclaw.
  *
  *   - `env`:  value is in process env at `id` (optionally allowlisted via provider)
@@ -68,11 +68,35 @@ export interface SecretsConfig {
  */
 export type MessageReplyMode = 'card' | 'markdown' | 'text';
 
+export type AgentProvider = 'codex';
+export type CodexSandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access';
+
+export interface AgentPreferences {
+  /** Agent backend. Only Codex is wired in this bridge build. */
+  provider?: AgentProvider;
+  /** Codex CLI binary name/path. Default: `codex`. */
+  codexBinary?: string;
+  /** Optional model passed to `codex exec --model`. */
+  model?: string;
+  /** Optional Codex config profile passed to `--profile`. */
+  profile?: string;
+  /** Optional Codex profile-v2 config layer passed to `--profile-v2`. */
+  profileV2?: string;
+  /** Codex sandbox for generated shell commands. Default: workspace-write. */
+  sandbox?: CodexSandboxMode;
+  /** Pass `--skip-git-repo-check`. Default true for chat-selected cwd values. */
+  skipGitRepoCheck?: boolean;
+  /** Enable Codex web search for runs. Default false. */
+  search?: boolean;
+  /** Escape hatch for newer Codex flags that the bridge has not typed yet. */
+  extraArgs?: string[];
+}
+
 /**
  * Access control settings. All three lists default to "no restriction" when
  * empty / undefined, so existing deployments are not broken on upgrade.
  * Operators that want a hardened deployment fill these in via
- * `~/.lark-channel/config.json` (no CLI surface yet — by design, since
+ * `~/.lark-codex/config.json` (no CLI surface yet — by design, since
  * persisting the lists requires the operator to look up open_ids/chat_ids
  * out-of-band anyway).
  */
@@ -90,6 +114,8 @@ export interface AppAccess {
 }
 
 export interface AppPreferences {
+  /** Local coding agent configuration. */
+  agent?: AgentPreferences;
   /** Reply rendering mode for IM (group/p2p) messages. Default 'card'. */
   messageReply?: MessageReplyMode;
   /**
@@ -103,19 +129,19 @@ export interface AppPreferences {
   messageReplyMigrated?: boolean;
   /**
    * Whether to render tool-call blocks (Bash / Read / Edit / ...) in the
-   * output. Default true. Turn off if you only care about Claude's final
+   * output. Default true. Turn off if you only care about Codex's final
    * text answer and want to hide the "工具调用过程".
    */
   showToolCalls?: boolean;
   /**
-   * Cap on concurrent claude runs across all chats / topics. Excess runs
+   * Cap on concurrent agent runs across all chats / topics. Excess runs
    * queue FIFO. Default 10. Mostly relevant for topic groups where each
    * topic can spawn its own run; capping protects RAM / token spend.
    */
   maxConcurrentRuns?: number;
   /**
-   * Global default idle-timeout for claude runs, in minutes. When set,
-   * if claude emits no stream event for this long the bridge kills the
+   * Global default idle-timeout for agent runs, in minutes. When set,
+   * if Codex emits no stream event for this long the bridge kills the
    * run as presumed-hung. Undefined / 0 = no timeout (the default — runs
    * can hang indefinitely). Per-scope `/timeout` overrides this.
    */
@@ -124,7 +150,7 @@ export interface AppPreferences {
    * Whether the bot only responds to messages that @-mention it in groups
    * (regular and topic groups). p2p is always unrestricted. Default true:
    * groups are quiet unless the user @bot. Set false to let any group
-   * message reach Claude (the 0.1.21-and-earlier behavior).
+   * message reach Codex (the 0.1.21-and-earlier behavior).
    *
    * @全员 is never responded to regardless (SDK `respondToMentionAll: false`).
    * Cloud-doc comments still require @-mention unconditionally.
@@ -133,8 +159,8 @@ export interface AppPreferences {
   /** Access control — user/chat allowlists + admin gating. See AppAccess. */
   access?: AppAccess;
   /**
-   * Grace period (ms) between SIGTERM and SIGKILL when killing the claude
-   * subprocess. Bumped from a hardcoded 500ms because claude often has its
+   * Grace period (ms) between SIGTERM and SIGKILL when killing the agent
+   * subprocess. Bumped from a hardcoded 500ms because agents often have their
    * own subprocesses (e.g. lark-cli mid-OAuth) that need a moment to clean
    * up — too short a window and the SIGKILL cascade kills the descendants
    * before they can finish what the user is waiting on. Default 5000ms.
@@ -209,7 +235,7 @@ export function getShowToolCalls(cfg: AppConfig): boolean {
 export function getMaxConcurrentRuns(cfg: AppConfig): number {
   const raw = cfg.preferences?.maxConcurrentRuns;
   if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 1) return 10;
-  // Reasonable upper bound — at 50+ concurrent claudes the bot box is
+  // Reasonable upper bound — at 50+ concurrent agents the bot box is
   // probably already RAM-starved. Clamp to keep typos from killing the box.
   return Math.min(Math.floor(raw), 50);
 }
@@ -230,7 +256,7 @@ export function getRequireMentionInGroup(cfg: AppConfig): boolean {
  * the user didn't really mean.
  */
 /**
- * Grace period before SIGKILL fallback when stopping a claude subprocess.
+ * Grace period before SIGKILL fallback when stopping an agent subprocess.
  * Returns ms. Defaults to 5000 (5 seconds). Clamps to [100, 30000] so a
  * typo can't either make stop() effectively SIGKILL-immediate or hang for
  * minutes.
@@ -268,4 +294,28 @@ export function getRunIdleTimeoutMs(cfg: AppConfig): number | undefined {
   if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) return undefined;
   const clamped = Math.min(Math.max(Math.floor(raw), 1), 120);
   return clamped * 60_000;
+}
+
+export function getAgentPreferences(cfg: AppConfig): Required<
+  Pick<AgentPreferences, 'provider' | 'codexBinary' | 'sandbox' | 'skipGitRepoCheck' | 'search'>
+> &
+  Pick<AgentPreferences, 'model' | 'profile' | 'profileV2' | 'extraArgs'> {
+  const raw = cfg.preferences?.agent;
+  const sandbox = raw?.sandbox;
+  return {
+    provider: 'codex',
+    codexBinary: raw?.codexBinary || 'codex',
+    sandbox:
+      sandbox === 'read-only' || sandbox === 'workspace-write' || sandbox === 'danger-full-access'
+        ? sandbox
+        : 'workspace-write',
+    skipGitRepoCheck: raw?.skipGitRepoCheck !== false,
+    search: raw?.search === true,
+    ...(raw?.model ? { model: raw.model } : {}),
+    ...(raw?.profile ? { profile: raw.profile } : {}),
+    ...(raw?.profileV2 ? { profileV2: raw.profileV2 } : {}),
+    ...(Array.isArray(raw?.extraArgs)
+      ? { extraArgs: raw.extraArgs.filter((v): v is string => typeof v === 'string') }
+      : {}),
+  };
 }

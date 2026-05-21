@@ -1,37 +1,39 @@
-# lark-channel-bridge
+# lark-codex-bridge
 
-A lightweight bot that bridges Feishu / Lark messenger with your local Claude Code CLI. Run one command, scan a QR code to bind a Lark app, and talk to Claude from chat — read screenshots, edit code, anything you'd do at the terminal.
+A lightweight bot that bridges Feishu / Lark messenger with your local Codex CLI. Run one command, scan a QR code to bind a Lark app, and talk to Codex from chat — read screenshots, edit code, anything you'd do at the terminal.
+
+> Note: this project is forked from [feishu-claude-code-bridge](https://github.com/zarazhangrui/feishu-claude-code-bridge). It keeps the original Feishu/Lark bridge, session management, interactive cards, and setup wizard, while replacing the local agent backend from Claude Code with Codex CLI and renaming the package to `lark-codex-bridge`.
 
 [中文 README](./README.zh.md)
 
 ## What it does
 
-- Forwards Feishu / Lark messages (DM directly, or `@bot` in a group) to your local `claude` CLI, running in a working directory you control.
-- **Streaming card**: Claude's text and tool calls update on a single Lark card in real time — no waiting for the final reply.
-- **Per-chat sessions**: each chat keeps its own Claude session, so conversations resume where they left off.
+- Forwards Feishu / Lark messages (DM directly, or `@bot` in a group) to your local `codex` CLI, running in a working directory you control.
+- **Streaming card**: Codex's text and tool calls update on a single Lark card in real time — no waiting for the final reply.
+- **Per-chat sessions**: each chat keeps its own Codex thread, so conversations resume where they left off.
 - **Preempt + batch**: a new message interrupts the running run; rapid-fire messages get coalesced into one request.
 - **Multiple workspaces**: `/ws` switches between named project directories, with sessions tracked per workspace.
-- **Images and files**: send them to the bot directly — Claude reads the locally downloaded paths.
+- **Images and files**: send them to the bot directly — Codex reads the locally downloaded paths.
 - **Interactive cards**: `/help`, `/ws list`, `/status` return cards with buttons you can click.
 
 ## Prerequisites
 
 - Node.js **>= 20**
-- `claude` CLI installed and logged in — see https://docs.anthropic.com/en/docs/claude-code/quickstart
+- `codex` CLI installed and logged in — see https://developers.openai.com/codex
 - A Lark / Feishu **PersonalAgent** app (the QR-code wizard on first launch can create one for you).
 
 ## Install
 
 ```bash
-npm i -g lark-channel-bridge
+npm i -g lark-codex-bridge
 # or
-pnpm add -g lark-channel-bridge
+pnpm add -g lark-codex-bridge
 ```
 
 ## First run
 
 ```bash
-lark-channel-bridge start
+lark-codex-bridge start
 ```
 
 The first run detects there's no app configured and **opens a QR-code wizard**:
@@ -39,7 +41,7 @@ The first run detects there's no app configured and **opens a QR-code wizard**:
 1. A QR code renders in your terminal.
 2. Scan it with the Feishu / Lark app.
 3. Pick or create a PersonalAgent app.
-4. Credentials are written to `~/.lark-channel/config.json`.
+4. Credentials are written to `~/.lark-codex/config.json`.
 
 ### Granting scopes and event subscriptions
 
@@ -56,17 +58,17 @@ The wizard creates the app shell, but you still need to confirm a few things on 
 - `im.message.reaction.created_v1` / `deleted_v1` (optional)
 - `im.chat.member.bot.added_v1` (optional)
 
-After enabling those, run `lark-channel-bridge start` again. Once you see `✓ Connected`, find the bot in Feishu / Lark and start chatting.
+After enabling those, run `lark-codex-bridge start` again. Once you see `✓ Connected`, find the bot in Feishu / Lark and start chatting.
 
 ## Commands
 
 ### Host CLI
 
 ```
-lark-channel-bridge start [-c <config>]   Start the bot
-lark-channel-bridge ps                    List all running start processes on this machine
-lark-channel-bridge stop <id|#>           Stop a start process (SIGTERM, SIGKILL after 2s)
-lark-channel-bridge --help                List all commands
+lark-codex-bridge start [-c <config>]   Start the bot
+lark-codex-bridge ps                    List all running start processes on this machine
+lark-codex-bridge stop <id|#>           Stop a start process (SIGTERM, SIGKILL after 2s)
+lark-codex-bridge --help                List all commands
 ```
 
 > When the same app is started multiple times, Lark's open platform routes events to one of the live WebSocket connections at random. `start` detects existing processes for the same app and (in a TTY) prompts: `[c]ontinue / [k]ill old / [a]bort`. In non-TTY mode it warns and continues.
@@ -90,9 +92,9 @@ lark-channel-bridge --help                List all commands
 | `/ps` | List all `start` processes on this host, marking the one replying |
 | `/exit <id\|#>` | Stop a `start` process (your own → graceful; another's → SIGTERM) |
 | `/reconnect` | Force a WebSocket reconnect (use when the bot stops responding after a network blip) |
-| `/doctor [description]` | Feed recent logs and your description back to Claude for self-diagnosis |
+| `/doctor [description]` | Feed recent logs and your description back to Codex for self-diagnosis |
 | `/help` | Help card |
-| Any other `/xxx` | Forwarded verbatim to Claude |
+| Any other `/xxx` | Forwarded verbatim to Codex |
 
 **Reply policy**: in a DM, the bot replies to anything. In a **group (including topic groups), the bot only replies when `@`-mentioned** (default since 0.1.22); unmentioned messages are ignored. `@all` is never answered. Cloud-doc comments must mention the bot. To restore the older "always answer in groups" behaviour: `/config` → "Require @bot in groups" → No.
 
@@ -100,14 +102,41 @@ lark-channel-bridge --help                List all commands
 
 | Path | Content |
 |---|---|
-| `~/.lark-channel/config.json` | App credentials (App ID / Secret), mode 600 |
-| `~/.lark-channel/sessions.json` | Claude session id + cwd per chat / topic (+ optional `/timeout` override) |
-| `~/.lark-channel/workspaces.json` | Named-workspace map |
-| `~/.lark-channel/processes.json` | Process registry for live `start` instances (used by `ps`/`stop`); dead PIDs are auto-pruned |
-| `~/.lark-channel/media/<chatId>/` | Downloaded images / files, cleaned up after 24h |
-| `~/.lark-channel/logs/YYYY-MM-DD.log` | Structured run logs (JSONL), rotated daily; older than 7 days are pruned at startup (`LARK_CHANNEL_LOG_DAYS` env var overrides). `/doctor` reads these. |
+| `~/.lark-codex/config.json` | App credentials (App ID / Secret), mode 600 |
+| `~/.lark-codex/sessions.json` | Codex thread id + cwd per chat / topic (+ optional `/timeout` override) |
+| `~/.lark-codex/workspaces.json` | Named-workspace map |
+| `~/.lark-codex/processes.json` | Process registry for live `start` instances (used by `ps`/`stop`); dead PIDs are auto-pruned |
+| `~/.lark-codex/media/<chatId>/` | Downloaded images / files, cleaned up after 24h |
+| `~/.lark-codex/logs/YYYY-MM-DD.log` | Structured run logs (JSONL), rotated daily; older than 7 days are pruned at startup (`LARK_CODEX_LOG_DAYS` env var overrides). `/doctor` reads these. |
 
-> Upgrading from before 0.1.11? Run `lark-channel-bridge migrate` once — it moves anything under `~/.config/lark-channel-bridge/` and `~/.cache/lark-channel-bridge/` to the new location and upgrades `config.json` to the new schema.
+> Upgrading from before 0.1.11? Run `lark-codex-bridge migrate` once — it moves anything under `~/.config/lark-codex-bridge/` and `~/.cache/lark-codex-bridge/` to the new location and upgrades `config.json` to the new schema.
+
+## Codex Runtime Config
+
+Send `/config` in Feishu / Lark to tune the Codex subprocess. Changes apply to the next run:
+
+- `codexBinary`: Codex CLI command or absolute path; default `codex`
+- `model`: passed to `codex exec --model`; leave blank to use Codex defaults
+- `profile` / `profileV2`: passed as `--profile` and `--profile-v2`
+- `sandbox`: `workspace-write` (default), `read-only`, or `danger-full-access`
+- `skipGitRepoCheck`: enabled by default so `/cd` can point at non-Git folders
+- `search`: enables Web Search by launching `codex --search exec ...`
+
+You can also edit `~/.lark-codex/config.json` under `preferences.agent`:
+
+```json
+{
+  "preferences": {
+    "agent": {
+      "provider": "codex",
+      "codexBinary": "codex",
+      "sandbox": "workspace-write",
+      "skipGitRepoCheck": true,
+      "search": false
+    }
+  }
+}
+```
 
 ## Access control (optional)
 
@@ -150,7 +179,7 @@ Fill all three. The `/config` form catches common mistakes — e.g. if your admi
 Easiest path: have the target user send the bot a message (or `@`-mention it in the target group), then in your terminal:
 
 ```bash
-grep '"event":"enter"' ~/.lark-channel/logs/$(date +%Y-%m-%d).log | tail -5
+grep '"event":"enter"' ~/.lark-codex/logs/$(date +%Y-%m-%d).log | tail -5
 ```
 
 Every line carries `chatId` (group or DM id) and `senderId` (the user's `open_id`). Copy them from there.
@@ -166,7 +195,7 @@ The Feishu open-platform "Get user info" API also works but needs the `contact:u
 
 ### Advanced: editing the config file directly
 
-The `/config` form writes to `~/.lark-channel/config.json` under `preferences.access`:
+The `/config` form writes to `~/.lark-codex/config.json` under `preferences.access`:
 
 ```json
 {
@@ -184,11 +213,11 @@ After a manual edit, **restart the bridge** or send **`/reconnect`** from any al
 
 ## FAQ
 
-**The bot stays silent / Claude never replies.** Usually the `claude` CLI itself is not logged in, or the session points to a cwd that no longer exists. Send `/status` to inspect; `/new` to start a fresh session.
+**The bot stays silent / Codex never replies.** Usually the `codex` CLI itself is not logged in, or the session points to a cwd that no longer exists. Send `/status` to inspect; `/new` to start a fresh session.
 
-**Claude subprocess looks frozen (card stuck on the last frame).** Since 0.1.20 there's an idle watchdog: if Claude emits nothing for N minutes the process is killed and the card is annotated `⏱ N min no response, auto-terminated`. Disabled by default. Enable with `/config` (global, in minutes), or `/timeout 10` to set it on the current session; `/timeout off` disables for the session; `/timeout default` clears the session override.
+**Codex subprocess looks frozen (card stuck on the last frame).** Since 0.1.20 there's an idle watchdog: if Codex emits nothing for N minutes the process is killed and the card is annotated `⏱ N min no response, auto-terminated`. Disabled by default. Enable with `/config` (global, in minutes), or `/timeout 10` to set it on the current session; `/timeout off` disables for the session; `/timeout default` clears the session override.
 
-**Claude says it can't see the image I sent.** Upgrade to the latest version — releases before 0.1.0 had a filename-dedup bug.
+**Codex says it can't see the image I sent.** Confirm your local Codex CLI supports `codex exec --image`, then check the downloaded attachment path in the bridge logs.
 
 ## License
 

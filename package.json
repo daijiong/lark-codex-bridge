@@ -1,10 +1,10 @@
 {
-  "name": "lark-channel-bridge",
+  "name": "lark-codex-bridge",
   "version": "0.1.29",
-  "description": "Bridge Feishu/Lark messenger with local CLI coding agents (Claude Code, ...)",
+  "description": "Bridge Feishu/Lark messenger with local Codex CLI coding agents",
   "type": "module",
   "bin": {
-    "lark-channel-bridge": "./bin/lark-channel-bridge.mjs"
+    "lark-codex-bridge": "./bin/lark-codex-bridge.mjs"
   },
   "exports": {
     ".": {
@@ -48,8 +48,8 @@
   "keywords": [
     "feishu",
     "lark",
-    "claude",
-    "claude-code",
+    "codex",
+    "codex-cli",
     "cli",
     "channel",
     "bridge"

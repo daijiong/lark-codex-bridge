@@ -1,6 +1,13 @@
-import type { MessageReplyMode } from '../config/schema';
+import type { CodexSandboxMode, MessageReplyMode } from '../config/schema';
 
 export interface ConfigFormOpts {
+  codexBinary: string;
+  codexModel: string;
+  codexProfile: string;
+  codexProfileV2: string;
+  codexSandbox: CodexSandboxMode;
+  codexSkipGitRepoCheck: boolean;
+  codexSearch: boolean;
   messageReply: MessageReplyMode;
   showToolCalls: boolean;
   maxConcurrentRuns: number;
@@ -26,7 +33,7 @@ export function configFormCard(opts: ConfigFormOpts): object {
           tag: 'markdown',
           content:
             '⚙️ **偏好设置**\n\n' +
-            '调整 bot 的行为偏好。改完点提交,**立即生效**(无需重启)并写入 `~/.lark-channel/config.json`。',
+            '调整 bot 的行为偏好。改完点提交,**立即生效**(无需重启)并写入 `~/.lark-codex/config.json`。',
         },
         { tag: 'hr' },
         {
@@ -53,6 +60,112 @@ export function configFormCard(opts: ConfigFormOpts): object {
                 { text: { tag: 'plain_text', content: '消息卡片(默认)' }, value: 'markdown' },
               ],
             },
+            { tag: 'hr' },
+            {
+              tag: 'markdown',
+              content:
+                '🤖 **Codex 运行参数**\n\n' +
+                '_修改后从下一次 Codex run 开始生效；正在运行的任务不受影响_',
+            },
+            {
+              tag: 'markdown',
+              content:
+                '\n**Codex 命令**\n' +
+                '_默认 `codex`；如果你用自定义安装路径，可以填绝对路径_',
+            },
+            {
+              tag: 'input',
+              name: 'codex_binary',
+              default_value: opts.codexBinary,
+              placeholder: { tag: 'plain_text', content: 'codex' },
+              input_type: 'text',
+            },
+            {
+              tag: 'markdown',
+              content:
+                '\n**模型**\n' +
+                '_留空 = 使用 `~/.codex/config.toml` 或 Codex CLI 默认模型_',
+            },
+            {
+              tag: 'input',
+              name: 'codex_model',
+              default_value: opts.codexModel,
+              placeholder: { tag: 'plain_text', content: '留空=默认' },
+              input_type: 'text',
+            },
+            {
+              tag: 'markdown',
+              content:
+                '\n**Profile**\n' +
+                '_可选，对应 `codex exec --profile`_',
+            },
+            {
+              tag: 'input',
+              name: 'codex_profile',
+              default_value: opts.codexProfile,
+              placeholder: { tag: 'plain_text', content: '留空=不指定' },
+              input_type: 'text',
+            },
+            {
+              tag: 'markdown',
+              content:
+                '\n**Profile v2**\n' +
+                '_可选，对应 `codex exec --profile-v2`_',
+            },
+            {
+              tag: 'input',
+              name: 'codex_profile_v2',
+              default_value: opts.codexProfileV2,
+              placeholder: { tag: 'plain_text', content: '留空=不指定' },
+              input_type: 'text',
+            },
+            {
+              tag: 'markdown',
+              content:
+                '\n**Sandbox**\n' +
+                '_workspace-write:允许写当前工作区；read-only:只读；danger-full-access:不限制文件系统_',
+            },
+            {
+              tag: 'select_static',
+              name: 'codex_sandbox',
+              initial_option: opts.codexSandbox,
+              options: [
+                { text: { tag: 'plain_text', content: 'workspace-write(默认)' }, value: 'workspace-write' },
+                { text: { tag: 'plain_text', content: 'read-only' }, value: 'read-only' },
+                { text: { tag: 'plain_text', content: 'danger-full-access' }, value: 'danger-full-access' },
+              ],
+            },
+            {
+              tag: 'markdown',
+              content:
+                '\n**跳过 Git 仓库检查**\n' +
+                '_是(默认):允许 `/cd` 到非 Git 目录后继续运行 Codex_',
+            },
+            {
+              tag: 'select_static',
+              name: 'codex_skip_git_repo_check',
+              initial_option: opts.codexSkipGitRepoCheck ? 'yes' : 'no',
+              options: [
+                { text: { tag: 'plain_text', content: '是(默认)' }, value: 'yes' },
+                { text: { tag: 'plain_text', content: '否' }, value: 'no' },
+              ],
+            },
+            {
+              tag: 'markdown',
+              content:
+                '\n**Web Search**\n' +
+                '_否(默认):不启用 Codex 在线搜索；是:启动时传入 `--search`_',
+            },
+            {
+              tag: 'select_static',
+              name: 'codex_search',
+              initial_option: opts.codexSearch ? 'yes' : 'no',
+              options: [
+                { text: { tag: 'plain_text', content: '否(默认)' }, value: 'no' },
+                { text: { tag: 'plain_text', content: '是' }, value: 'yes' },
+              ],
+            },
+            { tag: 'hr' },
             {
               tag: 'markdown',
               content:
@@ -126,7 +239,7 @@ export function configFormCard(opts: ConfigFormOpts): object {
               content:
                 '\n**用户白名单**(`allowedUsers`)\n' +
                 '_只允许列表内的 open_id 跟 bot 交互。多个用英文逗号分隔。留空 = 不限制_\n' +
-                '_open_id 可从日志 `~/.lark-channel/logs/*.log` 里 grep `senderId` 字段_',
+                '_open_id 可从日志 `~/.lark-codex/logs/*.log` 里 grep `senderId` 字段_',
             },
             {
               tag: 'input',
@@ -214,6 +327,7 @@ export function configSavedCard(opts: ConfigFormOpts): object {
     const items = raw.split(',').map((s) => s.trim()).filter(Boolean);
     return items.length === 0 ? '_(不限制)_' : `${items.length} 项`;
   };
+  const optionalValue = (raw: string): string => raw.trim() || '默认';
   return {
     schema: '2.0',
     config: { summary: { content: '偏好已保存' } },
@@ -223,6 +337,14 @@ export function configSavedCard(opts: ConfigFormOpts): object {
           tag: 'markdown',
           content:
             '✅ **偏好已保存**\n\n' +
+            '🤖 **Codex**\n' +
+            `**命令**:\`${opts.codexBinary}\`\n` +
+            `**模型**:\`${optionalValue(opts.codexModel)}\`\n` +
+            `**Profile**:\`${optionalValue(opts.codexProfile)}\`\n` +
+            `**Profile v2**:\`${optionalValue(opts.codexProfileV2)}\`\n` +
+            `**Sandbox**:\`${opts.codexSandbox}\`\n` +
+            `**跳过 Git 仓库检查**:\`${opts.codexSkipGitRepoCheck ? '是' : '否'}\`\n` +
+            `**Web Search**:\`${opts.codexSearch ? '是' : '否'}\`\n\n` +
             `**消息回复方式**:${replyLabel}\n` +
             `**工具调用显示**:\`${opts.showToolCalls ? 'show' : 'hide'}\`\n` +
             `**并发上限**:\`${opts.maxConcurrentRuns}\`\n` +

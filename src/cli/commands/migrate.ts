@@ -15,8 +15,8 @@ interface LegacyShape {
 /**
  * One-shot migrator for two pre-0.1.11 changes:
  *
- *  1. Path: ~/.config/lark-channel-bridge/ + ~/.cache/lark-channel-bridge/
- *     → ~/.lark-channel/
+ *  1. Path: ~/.config/lark-codex-bridge/ + ~/.cache/lark-codex-bridge/
+ *     → ~/.lark-codex/
  *  2. Shape: { app: {...} } → { accounts: { app: {...} } }
  *
  * Idempotent — running on an already-migrated setup is a no-op.

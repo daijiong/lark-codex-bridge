@@ -13,6 +13,7 @@ export interface AgentRunOptions {
   cwd?: string;
   sessionId?: string;
   model?: string;
+  imagePaths?: string[];
   permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
   /**
    * Grace period (ms) between SIGTERM and SIGKILL when stop() is called on
@@ -33,7 +34,7 @@ export interface AgentRun {
    * fired first (caller usually wants to fall back to stop()).
    *
    * Use this after a terminal stream event (`done` / `error`): the
-   * stream-json `result` line arrives before claude has actually closed
+   * stream-json `result` line arrives before the agent has actually closed
    * stdout — there's a brief telemetry/cleanup tail in between. Calling
    * stop() in that window forces a SIGTERM and the run exits with code
    * 143 instead of 0; waiting it out lets it exit cleanly.
