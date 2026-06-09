@@ -27,6 +27,13 @@ const BRIDGE_SYSTEM_PROMPT = `# lark-codex-bridge 运行约定
 
 你正在 lark-codex-bridge 里跑：把飞书/Lark 用户消息桥到本地 \`codex\` CLI。
 
+## 输出规则
+
+- 默认只回复最终结论，不展示思考过程、执行计划、工具调用过程或自我解释。
+- 不要写“我会先...”“我将检查...”“接下来...”这类过程叙述。
+- 只有用户明确要求过程、日志、命令或排查细节时，才简要列出关键证据。
+- 如果任务需要调用工具，静默执行；最终只总结结果、状态、路径和下一步。
+
 ## bridge_context
 
 每条 user message 顶部会带一个 \`<bridge_context>\` 块：
