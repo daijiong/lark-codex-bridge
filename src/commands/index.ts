@@ -1,5 +1,6 @@
 import { stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
+import { isAbsolute, resolve as resolvePath } from 'node:path';
 import type { LarkChannel, NormalizedMessage } from '@larksuiteoapi/node-sdk';
 import type { AgentAdapter } from '../agent/types';
 import type { ActiveRuns } from '../bot/active-runs';
@@ -197,7 +198,7 @@ async function reply(ctx: CommandContext, markdown: string): Promise<void> {
 
 function expandTilde(p: string): string {
   if (p === '~') return homedir();
-  if (p.startsWith('~/')) return `${homedir()}${p.slice(1)}`;
+  if (p.startsWith('~/') || p.startsWith('~\\')) return resolvePath(homedir(), p.slice(2));
   return p;
 }
 
@@ -260,11 +261,11 @@ async function handleCd(args: string, ctx: CommandContext): Promise<void> {
     await reply(ctx, '用法：`/cd <绝对路径>` 或 `/cd ~/xxx`');
     return;
   }
-  if (!input.startsWith('/') && !input.startsWith('~')) {
+  const absolute = expandTilde(input);
+  if (!isAbsolute(absolute)) {
     await reply(ctx, '请使用绝对路径，或 `~/xxx` 表示 home 下的子路径。');
     return;
   }
-  const absolute = expandTilde(input);
   try {
     const st = await stat(absolute);
     if (!st.isDirectory()) {

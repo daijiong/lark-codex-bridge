@@ -111,7 +111,10 @@ export class CodexAdapter implements AgentAdapter {
   async isAvailable(): Promise<boolean> {
     const opts = this.currentOptions();
     return new Promise((resolve) => {
-      const child = spawn(opts.binary, ['--version'], { stdio: 'ignore' });
+      const child = spawn(opts.binary, ['--version'], {
+        stdio: 'ignore',
+        shell: process.platform === 'win32',
+      });
       child.on('error', () => resolve(false));
       child.on('exit', (code) => resolve(code === 0));
     });
@@ -124,6 +127,7 @@ export class CodexAdapter implements AgentAdapter {
       cwd: opts.cwd,
       env: { ...process.env, LARK_CODEX: '1' },
       stdio: ['pipe', 'pipe', 'pipe'],
+      shell: process.platform === 'win32',
     });
 
     child.stdin.on('error', () => {
