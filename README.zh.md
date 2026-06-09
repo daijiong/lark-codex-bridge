@@ -60,6 +60,64 @@ lark-codex-bridge start
 
 启用以后再次 `lark-codex-bridge start`，看到 `✓ 已连接` 就可以在飞书里找 bot 对话了。
 
+### Windows 后台运行和开机自启动
+
+前台验证能连上以后，可以在 Windows 里把 bridge 放到隐藏后台进程运行：
+
+```powershell
+$bridgeCmd = "$env:APPDATA\npm\lark-codex-bridge.cmd"
+$workDir = "D:\Workspaces\lark-codex-bridge"
+$logFile = "$HOME\.lark-codex\logs\autostart.log"
+New-Item -ItemType Directory -Force -Path (Split-Path $logFile) | Out-Null
+Start-Process powershell.exe -WindowStyle Hidden -WorkingDirectory $workDir -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"Set-Location -LiteralPath '$workDir'; & '$bridgeCmd' start *>> '$logFile'`""
+```
+
+查看当前运行的 bot：
+
+```powershell
+lark-codex-bridge ps
+```
+
+停止后台服务：
+
+```powershell
+lark-codex-bridge stop <id|#>
+```
+
+要设置当前用户登录后自动启动，可以把同一条启动命令写成启动文件夹里的快捷方式：
+
+```powershell
+$bridgeCmd = "$env:APPDATA\npm\lark-codex-bridge.cmd"
+$workDir = "D:\Workspaces\lark-codex-bridge"
+$logFile = "$HOME\.lark-codex\logs\autostart.log"
+$startup = [Environment]::GetFolderPath("Startup")
+$linkPath = Join-Path $startup "Lark Codex Bridge.lnk"
+$arguments = "-NoProfile -ExecutionPolicy Bypass -Command `"Set-Location -LiteralPath '$workDir'; & '$bridgeCmd' start *>> '$logFile'`""
+$shell = New-Object -ComObject WScript.Shell
+$shortcut = $shell.CreateShortcut($linkPath)
+$shortcut.TargetPath = "powershell.exe"
+$shortcut.Arguments = $arguments
+$shortcut.WorkingDirectory = $workDir
+$shortcut.WindowStyle = 7
+$shortcut.Description = "Start lark-codex-bridge on user login"
+$shortcut.Save()
+```
+
+日志会写到 `~/.lark-codex/logs/autostart.log`。要取消开机自启动，删除启动文件夹里的 `Lark Codex Bridge.lnk` 即可。
+
+如果 Windows 下明明能在 PowerShell 里运行 `codex --version`，但 bridge 启动时报 `未找到 Codex CLI (codex)`，通常是 Node 子进程不能解析 `codex.ps1` / `codex.cmd` 这类 shim。可以把真实的 `codex.exe` 绝对路径写进 `~/.lark-codex/config.json`：
+
+```powershell
+$codexExe = (Get-ChildItem -Path "$env:APPDATA\npm\node_modules\@openai\codex" -Recurse -Filter codex.exe | Select-Object -First 1 -ExpandProperty FullName)
+$configPath = "$HOME\.lark-codex\config.json"
+$config = Get-Content -Raw $configPath | ConvertFrom-Json
+if ($null -eq $config.preferences) { $config | Add-Member -NotePropertyName preferences -NotePropertyValue ([pscustomobject]@{}) }
+if ($null -eq $config.preferences.agent) { $config.preferences | Add-Member -NotePropertyName agent -NotePropertyValue ([pscustomobject]@{}) }
+$config.preferences.agent | Add-Member -Force -NotePropertyName provider -NotePropertyValue "codex"
+$config.preferences.agent | Add-Member -Force -NotePropertyName codexBinary -NotePropertyValue $codexExe
+$config | ConvertTo-Json -Depth 20 | Set-Content -Path $configPath -Encoding UTF8
+```
+
 ## 命令速查
 
 ### 宿主 CLI
