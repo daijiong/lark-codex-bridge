@@ -422,6 +422,11 @@ async function intakeMessage(deps: IntakeDeps): Promise<void> {
     return;
   }
 
+  if (shouldSkipLowIntentDm(msg)) {
+    log.info('intake', 'skip-low-intent-dm', { scope, preview, resources: msg.resources.length });
+    return;
+  }
+
   const size = pending.push(scope, msg);
   log.info('intake', 'queued', { scope, queueSize: size, debounceMs: DEBOUNCE_MS });
 }
@@ -806,4 +811,44 @@ function stripAttachmentRefs(text: string, fileKeys: string[]): string {
     out = out.replace(new RegExp(`!?\\[[^\\]]*\\]\\(${escaped}\\)`, 'g'), '');
   }
   return out.replace(/\n{3,}/g, '\n\n');
+}
+
+export function shouldSkipLowIntentDm(msg: Pick<NormalizedMessage, 'chatType' | 'content' | 'resources'>): boolean {
+  if (msg.chatType !== 'p2p') return false;
+
+  const text = normalizeMessageText(msg.content, msg.resources.map((r) => r.fileKey));
+  if (!text) return msg.resources.length > 0;
+
+  if (LOW_INTENT_DM_EXACT.has(text)) return true;
+  if (/^(?:你)?还?在(?:吗|么|不在|的)?[?？!！。,.，]*$/.test(text)) return true;
+  if (/^(?:这个|这条|这张|这个图|这也|还有这个)(?:也)?(?:触发了|也是|也触发)?[?？!！。,.，]*$/.test(text)) return true;
+
+  return msg.resources.length > 0 && !ACTION_INTENT_PATTERN.test(text);
+}
+
+const LOW_INTENT_DM_EXACT = new Set([
+  '在',
+  '在哪',
+  '在吗',
+  '在么',
+  '在不',
+  '在不在',
+  '有人吗',
+  '在线吗',
+  'ping',
+  '测试',
+  '这个也触发了',
+  '这个也触发',
+  '这也触发了',
+  '还有这个也是',
+]);
+
+const ACTION_INTENT_PATTERN =
+  /(帮我|请|需要|整理|统计|汇总|分析|提取|生成|转换|处理|检查|核对|修改|优化|总结|翻译|做|输出|导出|制作|识别|读取|查|查一下|看一下|修|修复|执行|运行|打开|部署|发布)/;
+
+function normalizeMessageText(content: string, fileKeys: string[]): string {
+  return stripAttachmentRefs(content, fileKeys)
+    .replace(/\s+/g, '')
+    .replace(/[?？!！。,.，]+$/g, '')
+    .toLowerCase();
 }
