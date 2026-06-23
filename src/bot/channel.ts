@@ -844,7 +844,7 @@ const LOW_INTENT_DM_EXACT = new Set([
 ]);
 
 const ACTION_INTENT_PATTERN =
-  /(帮我|请|需要|整理|统计|汇总|分析|提取|生成|转换|处理|检查|核对|修改|优化|总结|翻译|做|输出|导出|制作|识别|读取|查|查一下|看一下|修|修复|执行|运行|打开|部署|发布)/;
+  /(帮我|帮忙|请|需要|整理|统计|汇总|分析|提取|生成|转换|处理|检查|核对|修改|优化|总结|翻译|做|输出|导出|制作|识别|读取|查|查一下|看一下|修|修复|执行|运行|打开|部署|发布|配对|批准|同意|approve)/;
 
 function normalizeMessageText(content: string, fileKeys: string[]): string {
   return stripAttachmentRefs(content, fileKeys)
