@@ -818,12 +818,13 @@ export function shouldSkipLowIntentDm(msg: Pick<NormalizedMessage, 'chatType' | 
 
   const text = normalizeMessageText(msg.content, msg.resources.map((r) => r.fileKey));
   if (!text) return msg.resources.length > 0;
+  if (msg.resources.length === 0) return false;
 
   if (LOW_INTENT_DM_EXACT.has(text)) return true;
   if (/^(?:你)?还?在(?:吗|么|不在|的)?[?？!！。,.，]*$/.test(text)) return true;
   if (/^(?:这个|这条|这张|这个图|这也|还有这个)(?:也)?(?:触发了|也是|也触发)?[?？!！。,.，]*$/.test(text)) return true;
 
-  return msg.resources.length > 0 && !ACTION_INTENT_PATTERN.test(text);
+  return !ACTION_INTENT_PATTERN.test(text);
 }
 
 const LOW_INTENT_DM_EXACT = new Set([

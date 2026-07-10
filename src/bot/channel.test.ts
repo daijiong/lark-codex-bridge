@@ -7,18 +7,18 @@ const imageResource = {
 } as const;
 
 describe('shouldSkipLowIntentDm', () => {
-  it('skips short p2p presence probes', () => {
+  it('keeps text-only p2p presence probes', () => {
     expect(shouldSkipLowIntentDm({
       chatType: 'p2p',
       content: '在?',
       resources: [],
-    })).toBe(true);
+    })).toBe(false);
 
     expect(shouldSkipLowIntentDm({
       chatType: 'p2p',
       content: '在的?',
       resources: [],
-    })).toBe(true);
+    })).toBe(false);
   });
 
   it('skips low-intent image followups without action words', () => {
