@@ -37,6 +37,14 @@ describe('shouldSkipLowIntentDm', () => {
     })).toBe(false);
   });
 
+  it('keeps p2p image pairing approval requests', () => {
+    expect(shouldSkipLowIntentDm({
+      chatType: 'p2p',
+      content: '![image](img_v3_0212n_test)\n有同事在飞书上要和虾小聘沟通，你帮忙配对一下',
+      resources: [imageResource],
+    })).toBe(false);
+  });
+
   it('does not skip group messages', () => {
     expect(shouldSkipLowIntentDm({
       chatType: 'group',
